@@ -83,3 +83,17 @@
         }))
     (ok true))
 )
+
+(define-private (get-collateral-ratio 
+    (borrow-amount uint) 
+    (collateral-amount uint) 
+    (borrow-token principal)
+    (collateral-token principal))
+    (let (
+        (borrow-value (* borrow-amount 
+            (unwrap! (map-get? price-feeds borrow-token) err-pool-not-found)))
+        (collateral-value (* collateral-amount 
+            (unwrap! (map-get? price-feeds collateral-token) err-pool-not-found)))
+    )
+    (/ (* collateral-value u100) borrow-value))
+)
