@@ -52,3 +52,15 @@
 )
 
 (define-map price-feeds principal uint)
+
+;; Private Functions
+(define-private (calculate-interest-rate (total-supply uint) (total-borrowed uint))
+    (let (
+        (utilization-rate (if (is-eq total-supply u0)
+            u0
+            (/ (* total-borrowed u10000) total-supply)))
+        (base-rate u200) ;; 2% base rate
+        (multiplier u1000) ;; 10% multiplier
+    )
+    (+ base-rate (* utilization-rate multiplier)))
+)
