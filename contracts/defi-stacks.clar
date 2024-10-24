@@ -42,3 +42,13 @@
     }
 )
 
+(define-map user-borrows
+    { user: principal, token: principal }
+    {
+        amount: uint,
+        collateral: uint,
+        last-update: uint
+    }
+)
+
+(define-map price-feeds principal uint)
