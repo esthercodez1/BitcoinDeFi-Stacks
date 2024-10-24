@@ -112,3 +112,38 @@
         })
         (ok true))
 )
+
+(define-public (deposit (token principal) (amount uint))
+    (let (
+        (pool (unwrap! (map-get? pools token) err-pool-not-found))
+        (sender-balance (unwrap! (contract-call? .token get-balance tx-sender) err-not-enough-balance))
+    )
+    (asserts! (>= sender-balance amount) err-not-enough-balance)
+    (asserts! (not (var-get protocol-paused)) err-not-initialized)
+    
+    ;; Transfer tokens to protocol
+    (try! (contract-call? .token transfer amount tx-sender (as-contract tx-sender)))
+    
+    ;; Update pool state
+    (map-set pools token
+        (merge pool {
+            total-supply: (+ (get total-supply pool) amount),
+            last-update-block: block-height
+        }))
+    
+    ;; Update user deposits
+    (map-set user-deposits 
+        { user: tx-sender, token: token }
+        {
+            amount: (+ amount
+                (default-to u0 
+                    (get amount (map-get? user-deposits 
+                        { user: tx-sender, token: token })))),
+            rewards-index: block-height
+        })
+    
+    ;; Update protocol stats
+    (var-set total-value-locked (+ (var-get total-value-locked) amount))
+    
+    (ok true))
+)
