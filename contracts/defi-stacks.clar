@@ -57,6 +57,11 @@
 (define-map price-feeds principal uint)
 
 ;; Private Functions
+(define-private (get-minimum (a uint) (b uint))
+    (if (<= a b)
+        a
+        b))
+
 (define-private (calculate-interest-rate (total-supply uint) (total-borrowed uint))
     (let (
         (utilization-rate (if (is-eq total-supply u0)
@@ -228,7 +233,7 @@
         (borrow-info (unwrap! (map-get? user-borrows
             { user: tx-sender, token: token })
             err-not-enough-balance))
-        (repay-amount (min amount (get amount borrow-info)))
+        (repay-amount (get-minimum amount (get amount borrow-info)))
     )
     (asserts! (not (var-get protocol-paused)) err-not-initialized)
     
