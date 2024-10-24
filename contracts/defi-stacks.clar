@@ -97,3 +97,18 @@
     )
     (/ (* collateral-value u100) borrow-value))
 )
+
+;; Public Functions
+(define-public (initialize-pool (token principal))
+    (begin
+        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+        (asserts! (is-none (map-get? pools token)) err-already-initialized)
+        (map-set pools token {
+            total-supply: u0,
+            total-borrowed: u0,
+            supply-rate: u0,
+            borrow-rate: u200, ;; 2% initial rate
+            last-update-block: block-height
+        })
+        (ok true))
+)
