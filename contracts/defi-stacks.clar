@@ -244,3 +244,24 @@
     
     (ok true))
 )
+
+;; Read-only functions
+(define-read-only (get-pool-info (token principal))
+    (map-get? pools token)
+)
+
+(define-read-only (get-user-deposits (user principal) (token principal))
+    (map-get? user-deposits { user: user, token: token })
+)
+
+(define-read-only (get-user-borrows (user principal) (token principal))
+    (map-get? user-borrows { user: user, token: token })
+)
+
+(define-read-only (get-protocol-stats)
+    {
+        tvl: (var-get total-value-locked),
+        total-borrowed: (var-get total-borrowed),
+        last-price-update: (var-get last-price-update)
+    }
+)
