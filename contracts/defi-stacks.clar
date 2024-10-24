@@ -64,3 +64,22 @@
     )
     (+ base-rate (* utilization-rate multiplier)))
 )
+
+(define-private (update-pool-rates (token principal))
+    (let (
+        (pool (unwrap! (map-get? pools token) err-pool-not-found))
+        (new-borrow-rate (calculate-interest-rate 
+            (get total-supply pool)
+            (get total-borrowed pool)))
+        (new-supply-rate (/ (* new-borrow-rate 
+            (get total-borrowed pool))
+            (get total-supply pool)))
+    )
+    (map-set pools token
+        (merge pool {
+            borrow-rate: new-borrow-rate,
+            supply-rate: new-supply-rate,
+            last-update-block: block-height
+        }))
+    (ok true))
+)
