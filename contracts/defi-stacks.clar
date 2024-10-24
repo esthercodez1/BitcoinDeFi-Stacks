@@ -15,3 +15,9 @@
 (define-constant liquidation-threshold u130) ;; 130% threshold for liquidation
 (define-constant liquidation-penalty u110) ;; 110% - liquidator gets 10% bonus
 (define-constant protocol-fee u10) ;; 0.1% fee (basis points)
+
+;; Data Variables
+(define-data-var protocol-paused bool false)
+(define-data-var total-value-locked uint u0)
+(define-data-var total-borrowed uint u0)
+(define-data-var last-price-update uint u0)
