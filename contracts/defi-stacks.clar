@@ -2,6 +2,9 @@
 ;; Version: 1.0.0
 ;; Description: A DeFi protocol enabling lending, borrowing, and liquidity provision on Bitcoin through Stacks
 
+;; Define SIP-010 Trait
+(use-trait ft-trait .sip-010-trait.sip-010-trait)
+
 ;; Constants
 (define-constant contract-owner tx-sender)
 (define-constant err-owner-only (err u100))
@@ -99,30 +102,36 @@
 )
 
 ;; Public Functions
-(define-public (initialize-pool (token principal))
-    (begin
-        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
-        (asserts! (is-none (map-get? pools token)) err-already-initialized)
-        (map-set pools token {
-            total-supply: u0,
-            total-borrowed: u0,
-            supply-rate: u0,
-            borrow-rate: u200, ;; 2% initial rate
-            last-update-block: block-height
-        })
-        (ok true))
+(define-public (initialize-pool (token-contract <ft-trait>))
+    (let ((token (contract-of token-contract)))
+        (begin
+            (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+            (asserts! (is-none (map-get? pools token)) err-already-initialized)
+            (map-set pools token {
+                total-supply: u0,
+                total-borrowed: u0,
+                supply-rate: u0,
+                borrow-rate: u200, ;; 2% initial rate
+                last-update-block: block-height
+            })
+            (ok true)))
 )
 
-(define-public (deposit (token principal) (amount uint))
+(define-public (deposit (token-contract <ft-trait>) (amount uint))
     (let (
+        (token (contract-of token-contract))
         (pool (unwrap! (map-get? pools token) err-pool-not-found))
-        (sender-balance (unwrap! (contract-call? .token get-balance tx-sender) err-not-enough-balance))
+        (sender-balance (unwrap! (contract-call? token-contract get-balance tx-sender) err-not-enough-balance))
     )
     (asserts! (>= sender-balance amount) err-not-enough-balance)
     (asserts! (not (var-get protocol-paused)) err-not-initialized)
     
     ;; Transfer tokens to protocol
-    (try! (contract-call? .token transfer amount tx-sender (as-contract tx-sender)))
+    (try! (contract-call? token-contract transfer 
+        amount 
+        tx-sender 
+        (as-contract tx-sender) 
+        none))
     
     ;; Update pool state
     (map-set pools token
@@ -149,14 +158,16 @@
 )
 
 (define-public (borrow 
-    (borrow-token principal)
+    (borrow-token-contract <ft-trait>)
     (borrow-amount uint)
-    (collateral-token principal)
+    (collateral-token-contract <ft-trait>)
     (collateral-amount uint))
     (let (
+        (borrow-token (contract-of borrow-token-contract))
+        (collateral-token (contract-of collateral-token-contract))
         (pool (unwrap! (map-get? pools borrow-token) err-pool-not-found))
         (collateral-balance (unwrap! 
-            (contract-call? .token get-balance tx-sender) 
+            (contract-call? collateral-token-contract get-balance tx-sender) 
             err-not-enough-balance))
     )
     (asserts! (>= collateral-balance collateral-amount) err-not-enough-balance)
@@ -172,10 +183,11 @@
         err-insufficient-collateral)
     
     ;; Transfer collateral to protocol
-    (try! (contract-call? .token transfer 
+    (try! (contract-call? collateral-token-contract transfer 
         collateral-amount
         tx-sender
-        (as-contract tx-sender)))
+        (as-contract tx-sender)
+        none))
     
     ;; Update pool state
     (map-set pools borrow-token
@@ -197,10 +209,11 @@
         })
     
     ;; Transfer borrowed tokens to user
-    (try! (contract-call? .token transfer
+    (try! (contract-call? borrow-token-contract transfer
         borrow-amount
         (as-contract tx-sender)
-        tx-sender))
+        tx-sender
+        none))
     
     ;; Update protocol stats
     (var-set total-borrowed (+ (var-get total-borrowed) borrow-amount))
@@ -208,8 +221,9 @@
     (ok true))
 )
 
-(define-public (repay (token principal) (amount uint))
+(define-public (repay (token-contract <ft-trait>) (amount uint))
     (let (
+        (token (contract-of token-contract))
         (pool (unwrap! (map-get? pools token) err-pool-not-found))
         (borrow-info (unwrap! (map-get? user-borrows
             { user: tx-sender, token: token })
@@ -219,10 +233,11 @@
     (asserts! (not (var-get protocol-paused)) err-not-initialized)
     
     ;; Transfer repayment to protocol
-    (try! (contract-call? .token transfer
+    (try! (contract-call? token-contract transfer
         repay-amount
         tx-sender
-        (as-contract tx-sender)))
+        (as-contract tx-sender)
+        none))
     
     ;; Update pool state
     (map-set pools token
