@@ -147,3 +147,63 @@
     
     (ok true))
 )
+
+(define-public (borrow 
+    (borrow-token principal)
+    (borrow-amount uint)
+    (collateral-token principal)
+    (collateral-amount uint))
+    (let (
+        (pool (unwrap! (map-get? pools borrow-token) err-pool-not-found))
+        (collateral-balance (unwrap! 
+            (contract-call? .token get-balance tx-sender) 
+            err-not-enough-balance))
+    )
+    (asserts! (>= collateral-balance collateral-amount) err-not-enough-balance)
+    (asserts! (not (var-get protocol-paused)) err-not-initialized)
+    
+    ;; Check collateralization ratio
+    (asserts! (>= (get-collateral-ratio 
+        borrow-amount
+        collateral-amount
+        borrow-token
+        collateral-token)
+        minimum-collateral-ratio)
+        err-insufficient-collateral)
+    
+    ;; Transfer collateral to protocol
+    (try! (contract-call? .token transfer 
+        collateral-amount
+        tx-sender
+        (as-contract tx-sender)))
+    
+    ;; Update pool state
+    (map-set pools borrow-token
+        (merge pool {
+            total-borrowed: (+ (get total-borrowed pool) borrow-amount),
+            last-update-block: block-height
+        }))
+    
+    ;; Update user borrows
+    (map-set user-borrows
+        { user: tx-sender, token: borrow-token }
+        {
+            amount: (+ borrow-amount
+                (default-to u0 
+                    (get amount (map-get? user-borrows
+                        { user: tx-sender, token: borrow-token })))),
+            collateral: collateral-amount,
+            last-update: block-height
+        })
+    
+    ;; Transfer borrowed tokens to user
+    (try! (contract-call? .token transfer
+        borrow-amount
+        (as-contract tx-sender)
+        tx-sender))
+    
+    ;; Update protocol stats
+    (var-set total-borrowed (+ (var-get total-borrowed) borrow-amount))
+    
+    (ok true))
+)
