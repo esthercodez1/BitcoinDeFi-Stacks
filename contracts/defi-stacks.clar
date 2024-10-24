@@ -207,3 +207,40 @@
     
     (ok true))
 )
+
+(define-public (repay (token principal) (amount uint))
+    (let (
+        (pool (unwrap! (map-get? pools token) err-pool-not-found))
+        (borrow-info (unwrap! (map-get? user-borrows
+            { user: tx-sender, token: token })
+            err-not-enough-balance))
+        (repay-amount (min amount (get amount borrow-info)))
+    )
+    (asserts! (not (var-get protocol-paused)) err-not-initialized)
+    
+    ;; Transfer repayment to protocol
+    (try! (contract-call? .token transfer
+        repay-amount
+        tx-sender
+        (as-contract tx-sender)))
+    
+    ;; Update pool state
+    (map-set pools token
+        (merge pool {
+            total-borrowed: (- (get total-borrowed pool) repay-amount),
+            last-update-block: block-height
+        }))
+    
+    ;; Update user borrows
+    (map-set user-borrows
+        { user: tx-sender, token: token }
+        (merge borrow-info {
+            amount: (- (get amount borrow-info) repay-amount),
+            last-update: block-height
+        }))
+    
+    ;; Update protocol stats
+    (var-set total-borrowed (- (var-get total-borrowed) repay-amount))
+    
+    (ok true))
+)
